@@ -13,6 +13,8 @@ import {
   PrunedScopeTerminal,
   getHookKind,
   isUseOperator,
+  Instruction,
+  Place,
 } from '../HIR';
 import {retainWhere} from '../Utils/utils';
 
@@ -53,7 +55,8 @@ export function flattenScopesWithHooksOrUseHIR(fn: HIRFunction): void {
             value.kind === 'MethodCall' ? value.property : value.callee;
           if (
             getHookKind(fn.env, callee.identifier) != null ||
-            isUseOperator(callee.identifier)
+            isUseOperator(callee.identifier) ||
+            isReadSignalViaTemporary(fn, callee)
           ) {
             prune.push(...activeScopes.map(entry => entry.block));
             activeScopes.length = 0;
@@ -107,4 +110,48 @@ export function flattenScopesWithHooksOrUseHIR(fn: HIRFunction): void {
       scope: terminal.scope,
     } as PrunedScopeTerminal;
   }
+}
+
+function isReadSignalViaTemporary(fn: HIRFunction, callee: Place): boolean {
+  // If the callee is a temporary, find its defining instruction and check
+  // if it directly loads a local named `readSignal`.
+  const def = findDefiningInstruction(fn, callee.identifier.id);
+  if (def == null) {
+    return false;
+  }
+  const v = def.value;
+  if (v.kind === 'LoadLocal' || v.kind === 'LoadContext') {
+    const src = v.place.identifier;
+    return src.name?.kind === 'named' && src.name.value === 'readSignal';
+  }
+  if (v.kind === 'PropertyLoad') {
+    return typeof v.property === 'string' && v.property === 'readSignal';
+  }
+  if (v.kind === 'LoadGlobal') {
+    const b = v.binding;
+    switch (b.kind) {
+      case 'Global':
+      case 'ImportDefault':
+      case 'ImportNamespace':
+      case 'ModuleLocal':
+        return b.name === 'readSignal';
+      case 'ImportSpecifier':
+        return b.name === 'readSignal';
+    }
+  }
+  return false;
+}
+
+function findDefiningInstruction(
+  fn: HIRFunction,
+  id: number,
+): Instruction | null {
+  for (const [, block] of fn.body.blocks) {
+    for (const instr of block.instructions) {
+      if (instr.lvalue.identifier.id === id) {
+        return instr;
+      }
+    }
+  }
+  return null;
 }

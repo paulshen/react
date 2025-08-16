@@ -302,13 +302,15 @@ export function inferReactivePlaces(fn: HIRFunction): void {
         if (
           value.kind === 'CallExpression' &&
           (getHookKind(fn.env, value.callee.identifier) != null ||
-            isUseOperator(value.callee.identifier))
+            isUseOperator(value.callee.identifier) ||
+            isReadSignalViaTemporary(fn, value.callee))
         ) {
           hasReactiveInput = true;
         } else if (
           value.kind === 'MethodCall' &&
           (getHookKind(fn.env, value.property.identifier) != null ||
-            isUseOperator(value.property.identifier))
+            isUseOperator(value.property.identifier) ||
+            isReadSignalViaTemporary(fn, value.property))
         ) {
           hasReactiveInput = true;
         }
@@ -403,6 +405,51 @@ export function inferReactivePlaces(fn: HIRFunction): void {
    * dependency instructions for scopes.
    */
   propagateReactivityToInnerFunctions(fn, true);
+}
+
+function isReadSignalViaTemporary(fn: HIRFunction, place: Place): boolean {
+  // Attempt to resolve a single-step temporary: if this place is defined
+  // by a LoadLocal/LoadContext from a local named `readSignal`, treat it
+  // as a readSignal call.
+  const def = findDefiningInstruction(fn, place.identifier.id);
+  if (def == null) {
+    return false;
+  }
+  const v = def.value;
+  if (v.kind === 'LoadLocal' || v.kind === 'LoadContext') {
+    const src = v.place.identifier;
+    return src.name?.kind === 'named' && src.name.value === 'readSignal';
+  }
+  if (v.kind === 'PropertyLoad') {
+    return typeof v.property === 'string' && v.property === 'readSignal';
+  }
+  if (v.kind === 'LoadGlobal') {
+    const b = v.binding;
+    switch (b.kind) {
+      case 'Global':
+      case 'ImportDefault':
+      case 'ImportNamespace':
+      case 'ModuleLocal':
+        return b.name === 'readSignal';
+      case 'ImportSpecifier':
+        return b.name === 'readSignal';
+    }
+  }
+  return false;
+}
+
+function findDefiningInstruction(
+  fn: HIRFunction,
+  id: IdentifierId,
+): Instruction | null {
+  for (const [, block] of fn.body.blocks) {
+    for (const instr of block.instructions) {
+      if (instr.lvalue.identifier.id === id) {
+        return instr;
+      }
+    }
+  }
+  return null;
 }
 
 /*
