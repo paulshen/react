@@ -1126,7 +1126,13 @@ function getComponentOrHookLike(
   if (node.isFunctionExpression() || node.isArrowFunctionExpression()) {
     if (isForwardRefCallback(node) || isMemoCallback(node)) {
       // As an added check we also look for hook invocations or JSX
-      return callsHooksOrCreatesJsx(node, hookPattern) ? 'Component' : null;
+      return callsHooksOrCreatesJsx(
+        node,
+        hookPattern,
+        effectfulFunctions,
+      )
+        ? 'Component'
+        : null;
     }
   }
   return null;
