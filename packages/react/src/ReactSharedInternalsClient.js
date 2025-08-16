@@ -28,6 +28,12 @@ export type SharedStateClient = {
   S: null | onStartTransitionFinish,
   G: null | onStartGestureTransitionFinish,
 
+  // MobX integration bridge (client-only)
+  // Optional hooks set by user-space to integrate render tracking + unmount cleanup.
+  MX_wrapRender: null | ((fiber: any, callRender: () => any) => any),
+  MX_onUnmount: null | ((fiber: any) => void),
+  MX_scheduleUpdate: null | ((fiber: any) => void),
+
   // DEV-only
 
   // ReactCurrentActQueue
@@ -62,6 +68,10 @@ const ReactSharedInternals: SharedStateClient = ({
   A: null,
   T: null,
   S: null,
+  // MobX bridge defaults
+  MX_wrapRender: null,
+  MX_onUnmount: null,
+  MX_scheduleUpdate: null,
 }: any);
 if (enableGestureTransition) {
   ReactSharedInternals.G = null;

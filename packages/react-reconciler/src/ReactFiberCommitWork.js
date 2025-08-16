@@ -42,6 +42,7 @@ import type {
   TransitionAbort,
 } from './ReactFiberTracingMarkerComponent';
 import type {ViewTransitionState} from './ReactFiberViewTransitionComponent';
+import ReactSharedInternals from 'shared/ReactSharedInternals';
 
 import {
   alwaysThrottleRetries,
@@ -1614,6 +1615,15 @@ function commitDeletionEffectsOnFiber(
     case ForwardRef:
     case MemoComponent:
     case SimpleMemoComponent: {
+      // Notify external integrations (e.g., MobX) to cleanup per-component resources
+      try {
+        const mxOnUnmount = (ReactSharedInternals: any).MX_onUnmount;
+        if (typeof mxOnUnmount === 'function') {
+          mxOnUnmount(deletedFiber);
+        }
+      } catch (e) {
+        // Ignore integration errors during unmount
+      }
       if (
         enableHiddenSubtreeInsertionEffectCleanup ||
         !offscreenSubtreeWasHidden

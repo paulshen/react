@@ -23,7 +23,9 @@ import CodePathAnalyzer from '../code-path-analysis/code-path-analyzer';
  * character to exclude identifiers like "user".
  */
 function isHookName(s: string): boolean {
-  return s === 'use' || /^use[A-Z0-9]/.test(s);
+  // Treat `read$` like `use`: it participates in hook-like analysis
+  // but is exempted in specific places (conditional/callback/loops).
+  return s === 'use' || s === 'read$' || /^use[A-Z0-9]/.test(s);
 }
 
 /**
@@ -137,7 +139,9 @@ function isUseEffectEventIdentifier(node: Node): boolean {
 }
 
 function isUseIdentifier(node: Node): boolean {
-  return isReactFunction(node, 'use');
+  // Treat both `use(...)` and `read$(...)` like special React operators
+  // that are exempt from some Rules of Hooks constraints.
+  return isReactFunction(node, 'use') || isReactFunction(node, 'read$');
 }
 
 const rule = {

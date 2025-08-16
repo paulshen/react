@@ -161,6 +161,17 @@ import {callComponentInDEV} from './ReactFiberCallUserSpace';
 
 import {scheduleGesture} from './ReactFiberGestureScheduler';
 
+// Expose minimal scheduleUpdate bridge for user-space integrations (e.g., MobX)
+// Assigned once so external code can request a re-render of a specific fiber.
+if (ReactSharedInternals && ReactSharedInternals.MX_scheduleUpdate == null) {
+  ReactSharedInternals.MX_scheduleUpdate = function MX_scheduleUpdate(fiber: Fiber) {
+    const root = enqueueConcurrentRenderForLane(fiber, SyncLane);
+    if (root !== null) {
+      scheduleUpdateOnFiber(root, fiber, SyncLane);
+    }
+  };
+}
+
 export type Update<S, A> = {
   lane: Lane,
   revertLane: Lane,
@@ -593,9 +604,20 @@ export function renderWithHooks<Props, SecondArg>(
     __DEV__ && (workInProgress.mode & StrictLegacyMode) !== NoMode;
 
   shouldDoubleInvokeUserFnsInHooksDEV = shouldDoubleRenderDEV;
-  let children = __DEV__
-    ? callComponentInDEV(Component, props, secondArg)
-    : Component(props, secondArg);
+  let children;
+  {
+    const wrap = (ReactSharedInternals: any).MX_wrapRender;
+    if (wrap) {
+      children = wrap(
+        currentlyRenderingFiber,
+        () => (__DEV__ ? callComponentInDEV(Component, props, secondArg) : Component(props, secondArg)),
+      );
+    } else {
+      children = __DEV__
+        ? callComponentInDEV(Component, props, secondArg)
+        : Component(props, secondArg);
+    }
+  }
   shouldDoubleInvokeUserFnsInHooksDEV = false;
 
   // Check if there was a render phase update
@@ -845,9 +867,19 @@ function renderWithHooksAgain<Props, SecondArg>(
       ? HooksDispatcherOnRerenderInDEV
       : HooksDispatcherOnRerender;
 
-    children = __DEV__
-      ? callComponentInDEV(Component, props, secondArg)
-      : Component(props, secondArg);
+    {
+      const wrap = (ReactSharedInternals: any).MX_wrapRender;
+      if (wrap) {
+        children = wrap(
+          currentlyRenderingFiber,
+          () => (__DEV__ ? callComponentInDEV(Component, props, secondArg) : Component(props, secondArg)),
+        );
+      } else {
+        children = __DEV__
+          ? callComponentInDEV(Component, props, secondArg)
+          : Component(props, secondArg);
+      }
+    }
   } while (didScheduleRenderPhaseUpdateDuringThisPass);
   return children;
 }
