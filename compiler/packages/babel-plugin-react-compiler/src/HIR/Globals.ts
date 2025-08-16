@@ -23,6 +23,7 @@ import {
   BuiltInUseInsertionEffectHookId,
   BuiltInUseLayoutEffectHookId,
   BuiltInUseOperatorId,
+  BuiltInReadDollarOperatorId,
   BuiltInUseReducerId,
   BuiltInUseRefId,
   BuiltInUseStateId,
@@ -831,6 +832,21 @@ const REACT_APIS: Array<[string, BuiltInType]> = [
         returnValueKind: ValueKind.Frozen,
       },
       BuiltInUseOperatorId,
+    ),
+  ],
+  [
+    'read$',
+    addFunction(
+      DEFAULT_SHAPES,
+      [],
+      {
+        positionalParams: [],
+        restParam: Effect.Freeze,
+        returnType: {kind: 'Poly'},
+        calleeEffect: Effect.Read,
+        returnValueKind: ValueKind.Frozen,
+      },
+      BuiltInReadDollarOperatorId,
     ),
   ],
   [

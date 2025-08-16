@@ -1911,7 +1911,9 @@ export function getHookKind(env: Environment, id: Identifier): HookKind | null {
 
 export function isUseOperator(id: Identifier): boolean {
   return (
-    id.type.kind === 'Function' && id.type.shapeId === 'BuiltInUseOperator'
+    id.type.kind === 'Function' &&
+    (id.type.shapeId === 'BuiltInUseOperator' ||
+      id.type.shapeId === 'BuiltInReadDollarOperator')
   );
 }
 

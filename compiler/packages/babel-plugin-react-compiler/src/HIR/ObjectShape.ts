@@ -376,6 +376,7 @@ export const BuiltInUseEffectHookId = 'BuiltInUseEffectHook';
 export const BuiltInUseLayoutEffectHookId = 'BuiltInUseLayoutEffectHook';
 export const BuiltInUseInsertionEffectHookId = 'BuiltInUseInsertionEffectHook';
 export const BuiltInUseOperatorId = 'BuiltInUseOperator';
+export const BuiltInReadDollarOperatorId = 'BuiltInReadDollarOperator';
 export const BuiltInUseReducerId = 'BuiltInUseReducer';
 export const BuiltInDispatchId = 'BuiltInDispatch';
 export const BuiltInUseContextHookId = 'BuiltInUseContextHook';
