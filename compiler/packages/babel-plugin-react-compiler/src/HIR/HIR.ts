@@ -1910,9 +1910,14 @@ export function getHookKind(env: Environment, id: Identifier): HookKind | null {
 }
 
 export function isUseOperator(id: Identifier): boolean {
-  return (
-    id.type.kind === 'Function' && id.type.shapeId === 'BuiltInUseOperator'
-  );
+  if (id.type.kind === 'Function' && id.type.shapeId === 'BuiltInUseOperator') {
+    return true;
+  }
+  // Also treat any identifier literally named "readSignal" as use-like.
+  if (id.name?.kind === 'named' && id.name.value === 'readSignal') {
+    return true;
+  }
+  return false;
 }
 
 export function getHookKindForType(
