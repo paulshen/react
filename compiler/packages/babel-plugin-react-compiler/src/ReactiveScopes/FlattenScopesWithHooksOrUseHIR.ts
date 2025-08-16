@@ -13,6 +13,7 @@ import {
   PrunedScopeTerminal,
   getHookKind,
   isUseOperator,
+  isReadSignalIdentifier,
 } from '../HIR';
 import {retainWhere} from '../Utils/utils';
 
@@ -27,6 +28,10 @@ import {retainWhere} from '../Utils/utils';
  * - It can be called conditionally, but _it must be called if the component needs the return value_. This is because
  *   React uses the fact that use was called to remember that the component needs the value, and that changes to the
  *   input should invalidate the component itself.
+ *
+ * Additionally, calls to identifiers named `readSignal` are treated the same as `use` for
+ * memoization purposes: they may introduce reactivity and must not be wrapped in memoized
+ * reactive scopes that would make the call conditional or skipped.
  *
  * This pass accounts for the "can't call conditionally" aspect of both hooks and use. Though the reasoning is slightly
  * different for reach, the result is that we can't memoize scopes that call hooks or use since this would make them
@@ -53,7 +58,8 @@ export function flattenScopesWithHooksOrUseHIR(fn: HIRFunction): void {
             value.kind === 'MethodCall' ? value.property : value.callee;
           if (
             getHookKind(fn.env, callee.identifier) != null ||
-            isUseOperator(callee.identifier)
+            isUseOperator(callee.identifier) ||
+            isReadSignalIdentifier(callee.identifier)
           ) {
             prune.push(...activeScopes.map(entry => entry.block));
             activeScopes.length = 0;

@@ -1915,6 +1915,21 @@ export function isUseOperator(id: Identifier): boolean {
   );
 }
 
+/**
+ * Detects an identifier that is literally named `readSignal`.
+ * This is used to treat calls like `readSignal(...)` similarly to the `use` operator
+ * (eg, as reactive sources and to prevent creating memoized reactive scopes).
+ *
+ * Note: this matches the local identifier name; it does not rely on global typing.
+ */
+export function isReadSignalIdentifier(id: Identifier): boolean {
+  return (
+    id.name != null &&
+    id.name.kind === 'named' &&
+    id.name.value === 'readSignal'
+  );
+}
+
 export function getHookKindForType(
   env: Environment,
   type: Type,
