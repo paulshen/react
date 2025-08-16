@@ -839,13 +839,16 @@ function getReactFunctionType(
   pass: CompilerPass,
 ): ReactFunctionType | null {
   const hookPattern = pass.opts.environment.hookPattern;
+  const effectfulFunctions = pass.opts.environment.effectfulFunctions;
   if (fn.node.body.type === 'BlockStatement') {
     const optInDirectives = tryFindDirectiveEnablingMemoization(
       fn.node.body.directives,
       pass.opts,
     );
     if (optInDirectives.unwrapOr(null) != null) {
-      return getComponentOrHookLike(fn, hookPattern) ?? 'Other';
+      return (
+        getComponentOrHookLike(fn, hookPattern, effectfulFunctions) ?? 'Other'
+      );
     }
   }
 
@@ -866,7 +869,10 @@ function getReactFunctionType(
     }
     case 'infer': {
       // Check if this is a component or hook-like function
-      return componentSyntaxType ?? getComponentOrHookLike(fn, hookPattern);
+      return (
+        componentSyntaxType ??
+        getComponentOrHookLike(fn, hookPattern, effectfulFunctions)
+      );
     }
     case 'syntax': {
       return componentSyntaxType;
@@ -877,7 +883,9 @@ function getReactFunctionType(
         return null;
       }
 
-      return getComponentOrHookLike(fn, hookPattern) ?? 'Other';
+      return (
+        getComponentOrHookLike(fn, hookPattern, effectfulFunctions) ?? 'Other'
+      );
     }
     default: {
       assertExhaustive(
@@ -919,7 +927,15 @@ function hasMemoCacheFunctionImport(
   return hasUseMemoCache;
 }
 
-function isHookName(s: string, hookPattern: string | null): boolean {
+function isHookName(
+  s: string,
+  hookPattern: string | null,
+  effectfulFunctions: ReadonlyArray<string>,
+): boolean {
+  // Configured effectful functions are not treated as hooks for detection
+  if (effectfulFunctions.includes(s)) {
+    return false;
+  }
   if (hookPattern !== null) {
     return new RegExp(hookPattern).test(s);
   }
@@ -934,13 +950,14 @@ function isHookName(s: string, hookPattern: string | null): boolean {
 function isHook(
   path: NodePath<t.Expression | t.PrivateName>,
   hookPattern: string | null,
+  effectfulFunctions: ReadonlyArray<string>,
 ): boolean {
   if (path.isIdentifier()) {
-    return isHookName(path.node.name, hookPattern);
+    return isHookName(path.node.name, hookPattern, effectfulFunctions);
   } else if (
     path.isMemberExpression() &&
     !path.node.computed &&
-    isHook(path.get('property'), hookPattern)
+    isHook(path.get('property'), hookPattern, effectfulFunctions)
   ) {
     const obj = path.get('object').node;
     const isPascalCaseNameSpace = /^[A-Z].*/;
@@ -1082,18 +1099,24 @@ function getComponentOrHookLike(
     t.FunctionDeclaration | t.ArrowFunctionExpression | t.FunctionExpression
   >,
   hookPattern: string | null,
+  effectfulFunctions: ReadonlyArray<string>,
 ): ReactFunctionType | null {
   const functionName = getFunctionName(node);
   // Check if the name is component or hook like:
   if (functionName !== null && isComponentName(functionName)) {
     let isComponent =
-      callsHooksOrCreatesJsx(node, hookPattern) &&
+      callsHooksOrCreatesJsx(node, hookPattern, effectfulFunctions) &&
       isValidComponentParams(node.get('params')) &&
       !returnsNonNode(node);
     return isComponent ? 'Component' : null;
-  } else if (functionName !== null && isHook(functionName, hookPattern)) {
+  } else if (
+    functionName !== null &&
+    isHook(functionName, hookPattern, effectfulFunctions)
+  ) {
     // Hooks have hook invocations or JSX, but can take any # of arguments
-    return callsHooksOrCreatesJsx(node, hookPattern) ? 'Hook' : null;
+    return callsHooksOrCreatesJsx(node, hookPattern, effectfulFunctions)
+      ? 'Hook'
+      : null;
   }
 
   /*
@@ -1130,6 +1153,7 @@ function callsHooksOrCreatesJsx(
     t.FunctionDeclaration | t.ArrowFunctionExpression | t.FunctionExpression
   >,
   hookPattern: string | null,
+  effectfulFunctions: ReadonlyArray<string>,
 ): boolean {
   let invokesHooks = false;
   let createsJsx = false;
@@ -1140,7 +1164,10 @@ function callsHooksOrCreatesJsx(
     },
     CallExpression(call) {
       const callee = call.get('callee');
-      if (callee.isExpression() && isHook(callee, hookPattern)) {
+      if (
+        callee.isExpression() &&
+        isHook(callee, hookPattern, effectfulFunctions)
+      ) {
         invokesHooks = true;
       }
     },

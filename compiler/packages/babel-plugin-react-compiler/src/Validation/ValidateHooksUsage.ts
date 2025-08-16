@@ -93,6 +93,14 @@ export function validateHooksUsage(
 ): Result<void, CompilerError> {
   const unconditionalBlocks = computeUnconditionalBlocks(fn);
 
+  function isHookLikeConsideringEffectfulFunctions(name: string): boolean {
+    // Treat configured effectful function names as non-hooks for validation.
+    if (fn.env.config.effectfulFunctions.includes(name)) {
+      return false;
+    }
+    return isHookName(name);
+  }
+
   const errors = new CompilerError();
   const errorsByPlace = new Map<t.SourceLocation, CompilerErrorDetail>();
 
@@ -173,7 +181,7 @@ export function validateHooksUsage(
     const knownKind = valueKinds.get(place.identifier.id);
     if (
       place.identifier.name !== null &&
-      isHookName(place.identifier.name.value)
+      isHookLikeConsideringEffectfulFunctions(place.identifier.name.value)
     ) {
       return joinKinds(knownKind ?? Kind.Local, Kind.PotentialHook);
     } else {
@@ -202,7 +210,9 @@ export function validateHooksUsage(
     for (const phi of block.phis) {
       let kind: Kind =
         phi.place.identifier.name !== null &&
-        isHookName(phi.place.identifier.name.value)
+        isHookLikeConsideringEffectfulFunctions(
+          phi.place.identifier.name.value,
+        )
           ? Kind.PotentialHook
           : Kind.Local;
       for (const [, operand] of phi.operands) {
@@ -262,7 +272,7 @@ export function validateHooksUsage(
           const objectKind = getKindForPlace(instr.value.object);
           const isHookProperty =
             typeof instr.value.property === 'string' &&
-            isHookName(instr.value.property);
+            isHookLikeConsideringEffectfulFunctions(instr.value.property);
           let kind: Kind;
           switch (objectKind) {
             case Kind.Error: {
@@ -363,7 +373,9 @@ export function validateHooksUsage(
           for (const lvalue of eachInstructionLValue(instr)) {
             const isHookProperty =
               lvalue.identifier.name !== null &&
-              isHookName(lvalue.identifier.name.value);
+              isHookLikeConsideringEffectfulFunctions(
+                lvalue.identifier.name.value,
+              );
             let kind: Kind;
             switch (objectKind) {
               case Kind.Error: {

@@ -46,6 +46,8 @@ import {
   FunctionSignature,
   ShapeRegistry,
   addHook,
+  addFunction,
+  BuiltInUseOperatorId,
 } from './ObjectShape';
 import {Scope as BabelScope, NodePath} from '@babel/traverse';
 import {TypeSchema} from './TypeSchema';
@@ -259,6 +261,15 @@ export const EnvironmentConfigSchema = z.object({
   enableOptionalDependencies: z.boolean().default(true),
 
   enableFire: z.boolean().default(false),
+
+  /**
+   * A list of functions that should be treated as effectful operations that
+   * must run on every render. These are handled like the `use` operator: they
+   * are considered reactive sources and are exempt from the Rules of Hooks.
+   *
+   * Specify plain function names (identifiers). For example: ["track", "log"]
+   */
+  effectfulFunctions: z.array(z.string()).default([]),
 
   /**
    * Enables inference and auto-insertion of effect dependencies. Takes in an array of
@@ -759,6 +770,34 @@ export class Environment {
           noAlias: hook.noAlias,
         }),
       );
+    }
+
+    // Register configured effectful functions as `use`-like in the global registry
+    // so that they are handled like `use` (always-run, reactive source, not hooks).
+    if (this.config.effectfulFunctions.length > 0) {
+      for (const fnName of this.config.effectfulFunctions) {
+        CompilerError.invariant(!this.#globals.has(fnName), {
+          reason: `[Globals] Found existing definition in global registry for effectful function ${fnName}`,
+          description: null,
+          loc: null,
+          suggestions: null,
+        });
+        this.#globals.set(
+          fnName,
+          addFunction(
+            this.#shapes,
+            [],
+            {
+              positionalParams: [],
+              restParam: Effect.Freeze,
+              returnType: {kind: 'Poly'},
+              calleeEffect: Effect.Read,
+              returnValueKind: ValueKind.Frozen,
+            },
+            BuiltInUseOperatorId,
+          ),
+        );
+      }
     }
 
     if (config.enableCustomTypeDefinitionForReanimated) {

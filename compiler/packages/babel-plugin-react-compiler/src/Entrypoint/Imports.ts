@@ -108,6 +108,10 @@ export class ProgramContext {
   }
 
   isHookName(name: string): boolean {
+    // Configured effectful function names are not considered hooks
+    if (this.opts.environment.effectfulFunctions.includes(name)) {
+      return false;
+    }
     if (this.opts.environment.hookPattern == null) {
       return isHookName(name);
     } else {
