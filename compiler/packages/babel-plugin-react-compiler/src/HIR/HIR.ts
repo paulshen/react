@@ -1915,6 +1915,41 @@ export function isUseOperator(id: Identifier): boolean {
   );
 }
 
+/**
+ * Treat any call with identifier name `readSignal` similar to the `use` operator:
+ * - It may be called conditionally.
+ * - It should never be skipped by memoization/flattening logic.
+ *
+ * Detection is purely name-based to match cases like:
+ *   const readSignal = useReadSignal();
+ *   readSignal(() => signal$());
+ */
+export function isNeverSkipIdentifier(
+  env: Environment,
+  id: Identifier,
+): boolean {
+  const list = env.config.neverSkipFunctionName;
+  if (list == null || list.length === 0) {
+    return false;
+  }
+  // Prefer the identifier's explicit name when available
+  if (id.name != null && list.includes(id.name.value)) {
+    return true;
+  }
+  // Fallback: some identifiers (e.g. temporaries) don't retain a name,
+  // but Babel may attach `identifierName` on the source location.
+  const loc = id.loc as any;
+  if (
+    loc &&
+    typeof loc !== 'symbol' &&
+    typeof loc.identifierName === 'string' &&
+    list.includes(loc.identifierName)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function getHookKindForType(
   env: Environment,
   type: Type,
